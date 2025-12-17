@@ -6,10 +6,9 @@
 ## 1. Overview
 
 **no-cursor** (`nc`) is a minimal, local, and free agentic code editor controlled entirely via the CLI.
-VS Code acts only as a passive viewer for files, diffs, and test results.
- 
-Plan to make it vim or nvim.
-The system is intentionally constrained to ensure completely local usage and reliability.
+VS Code (or vim/nvim) acts only as a passive viewer for files, diffs, and test results.
+Made coz tired of api ratelimits.
+The system is intentionally constrained to ensure completely local usage, safety, and predictability.
 
 ---
 
@@ -36,8 +35,9 @@ The system is intentionally constrained to ensure completely local usage and rel
 ## 4. User Workflow
 
 ```bash
+nc init
 nc open src/example.py
-nc ask "what does this file do?"
+nc ask
 nc edit "add basic input validation"
 nc diff
 nc apply
@@ -62,18 +62,46 @@ CLI → State → Prompt Engine → Local LLM → Diff → Validator → Apply/R
 
 ## 7. Model Strategy
 
-- Model: Qwen2.5-Coder 7B Instruct
-- Runtime: Ollama, llama.ccp
-- Mode: Deterministic, single-file execution
+- Code model: Qwen2.5-Coder 7B Instruct (via Ollama)
+- Embeddings (optional, local-only): small deterministic model
+- Mode: deterministic, single-file execution
 
 ---
 
-## 8. Success Criteria
+## 8. Interaction Modes
+
+### Ask Mode (Read-Only)
+- Interactive shell
+- No disk writes
+- Pure explanation
+
+### Edit Mode (Transactional)
+- Single-shot by default
+- Optional constrained instruction shell
+- Always diff-only
+- Never auto-apply
+
+---
+
+## 9. Intent Normalization (Post-MVP)
+
+After the basic `ask` and `edit` functionality is stable, nc may optionally introduce
+**embedding-based intent normalization** to improve UX in the edit shell.
+
+Scope is strictly limited:
+- Fuzzy matching of synonyms
+- Classification into fixed buckets (goal / constraints)
+- No autonomous reasoning
+- No hidden intent generation
+
+Embeddings are used only as a parser, never as a decision-maker.
+
+---
+
+## 10. Success Criteria
 
 - Simple feature implementations
 - Predictable diffs
 - Minimal edits
 - Low system requirements
 - Easy to reason about
-
----

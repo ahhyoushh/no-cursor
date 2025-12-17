@@ -20,6 +20,7 @@
 
 ### Tasks
 - Implement `nc` CLI entry point
+- Implement workspace init (`nc init`)
 - Implement `open` command
 - Track open file in local state
 
@@ -28,6 +29,7 @@
 - state.json
 
 ### Exit Criteria
+- Workspace initializes safely
 - File can be opened and tracked
 
 ---
@@ -44,43 +46,33 @@
 - prompts.py
 
 ### Exit Criteria
-- Model responds to prompts reliably
+- Model responds deterministically
 
 ---
 
 ## Phase 3 — Ask Mode (Read-Only)
 
 ### Tasks
-- Send file content + question to LLM
-- Display explanation output
-- Enforce no-edit behavior
-
-### Commands
-```bash
-nc ask "question"
-```
+- Implement interactive `nc ask` shell
+- Load file content once per session
+- Enforce zero disk writes
 
 ### Exit Criteria
 - Accurate file explanations
-- No file modification
+- No file modification possible
 
 ---
 
-## Phase 4 — Edit Mode (Diff Generation)
+## Phase 4 — Edit Mode (Basic)
 
 ### Tasks
-- Send file + instruction
+- Implement `nc edit "instruction"`
+- Send file + instruction to model
 - Force unified diff output
-- Reject prose or invalid output
-
-### Commands
-```bash
-nc edit "instruction"
-```
 
 ### Exit Criteria
 - Valid unified diff generated
-- Diff only, no commentary
+- Diff-only output enforced
 
 ---
 
@@ -107,18 +99,50 @@ nc edit "instruction"
 - Create backup before apply
 - Implement revert command
 
-### Commands
-```bash
-nc apply
-nc revert
-```
-
 ### Exit Criteria
 - Safe apply and rollback
 
 ---
 
-## Phase 7 — UX Polish
+## Phase 7 — Edit Instruction Shell (Post-MVP)
+
+### Tasks
+- Add optional interactive `nc edit` shell
+- Allow multi-line natural language input
+- Buffer instructions without calling model
+- Generate diff only on explicit `generate`
+
+### Rules
+- One diff per session
+- No iterative regeneration
+- Abortable without side effects
+
+### Exit Criteria
+- Instruction shell produces same diffs as single-shot edit
+- No additional autonomy introduced
+
+---
+
+## Phase 8 — Intent Normalization via Embeddings (Optional)
+
+### Tasks
+- Add local embedding model
+- Implement fuzzy matching for constraints and goals
+- Map natural language → fixed buckets
+- Enforce confidence thresholds
+
+### Constraints
+- No intent generation
+- No hidden behavior
+- No scope expansion
+
+### Exit Criteria
+- Improved UX for informal language
+- Identical model prompt semantics
+
+---
+
+## Phase 9 — UX Polish
 
 ### Tasks
 - Improve CLI messages
@@ -130,12 +154,12 @@ nc revert
 
 ---
 
-## Phase 8 — Hardening
+## Phase 10 — Hardening
 
 ### Tasks
 - Stress test with bad prompts
 - Handle model failure cases
-- Add timeouts
+- Add timeouts and locks
 
 ### Exit Criteria
 - Tool fails safely
@@ -149,5 +173,3 @@ A local, free, single-file agentic code editor that:
 - Never touches more than one file
 - Always produces diffs
 - Remains understandable
-
----
