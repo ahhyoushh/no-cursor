@@ -7,9 +7,12 @@
 
 **no-cursor** (`nc`) is a minimal, local, and free agentic code editor controlled entirely via the CLI.
 VS Code (or vim/nvim) acts only as a passive viewer for files, diffs, and test results.
+
 Made coz tired of api ratelimits.
+
 The system is intentionally constrained to ensure completely local usage, safety, and predictability.
 
+Not competing with cursor obviously 🥀
 ---
 
 ## 2. Core Goals
