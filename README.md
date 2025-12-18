@@ -1,6 +1,8 @@
 # no-cursor (nc)
 
-A **local, CLI-first, deterministic code assistant** built for safety and predictability.
+A **local, CLI-first, deterministic code assistant** built for completely local experience and reproducing simple unifile code.
+
+Was fed up from the gemini ratelimit ragebaits.
 
 No cloud APIs. No background agents. No autonomous edits.
 
@@ -79,7 +81,7 @@ Designed to work reliably with:
 
 * PowerShell
 * Windows Terminal
-* VS Code integrated terminal
+* VS Code integrated terminal ? Vim
 
 No readline / curses / external UI libraries used.
 
@@ -88,5 +90,3 @@ No readline / curses / external UI libraries used.
 ## Status
 
 MVP complete.
-Edit pipeline hardened.
-Shell UX stabilized.
