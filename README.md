@@ -18,7 +18,7 @@ Requires:
 
 * Python 3.10+
 * llama.cpp `llama-server`
-* A local GGUF model (tested with [Qwen2.5-Coder-3B-instruct-q4_k_m.gguf](https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/tree/main)) 
+* A local GGUF model (tested with [Qwen2.5-Coder-3B-instruct-q4_k_m.gguf](https://huggingface.co/Qwen/Qwen2.5-Coder-3B-Instruct-GGUF/tree/main) and planned with deepseek-ai/DeepSeek-R1-Distill-Qwen-1.5B) 
 
 ---
 
