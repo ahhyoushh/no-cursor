@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: no-cursor
+Version: 0.1.0
+Summary: Constrained local code assistant
+Requires-Python: >=3.10

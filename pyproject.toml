@@ -1,0 +1,11 @@
+[project]
+name = "no-cursor"
+version = "0.1.0"
+description = "Constrained local code assistant"
+requires-python = ">=3.10"
+
+[project.scripts]
+nc = "nc:main"
+
+[tool.setuptools]
+packages = ["nc"]

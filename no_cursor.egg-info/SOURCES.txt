@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+nc/__init__.py
+nc/config.py
+nc/diff_utils.py
+nc/llm.py
+nc/prompts.py
+no_cursor.egg-info/PKG-INFO
+no_cursor.egg-info/SOURCES.txt
+no_cursor.egg-info/dependency_links.txt
+no_cursor.egg-info/entry_points.txt
+no_cursor.egg-info/top_level.txt

@@ -1,110 +1,92 @@
 # no-cursor (nc)
-### High-Level Plan — Agentic Code Editor (CLI-First, Local-Only)
+
+A **local, CLI-first, deterministic code assistant** built for safety and predictability.
+
+No cloud APIs. No background agents. No autonomous edits.
 
 ---
 
-## 1. Overview
+## Installation
 
-**no-cursor** (`nc`) is a minimal, local, and free agentic code editor controlled entirely via the CLI.
-VS Code (or vim/nvim) acts only as a passive viewer for files, diffs, and test results.
+```bash
+pip install -e .
+```
 
-Made coz tired of api ratelimits.
+Requires:
 
-The system is intentionally constrained to ensure completely local usage, safety, and predictability.
-
-Not competing with cursor obviously 🥀
----
-
-## 2. Core Goals
-
-- Single-file intelligence
-- Diff-only edits
-- Fully local execution
-- Predictable behavior
-- Zero cloud dependency
+* Python 3.10+
+* llama.cpp `llama-server`
+* A local GGUF model (tested with Qwen2.5-Coder-3B)
 
 ---
 
-## 3. Non-Goals
-
-- Multi-file reasoning
-- Autonomous planning
-- API-based models
-- IDE replacement
-- Long-term memory
-
----
-
-## 4. User Workflow
+## Quick Start
 
 ```bash
 nc init
-nc open src/example.py
-nc ask
-nc edit "add basic input validation"
-nc diff
-nc apply
+```
+
+This will:
+
+* Create a `.nc/` workspace
+* Start the local llama.cpp model server
+* Drop you into the interactive `nc>` shell
+
+---
+
+## Typical Workflow
+
+```bash
+nc init
+nc> open test.py
+nc> ask explain this file
+nc> edit "replace b = x with b = a + x and print a + b"
+nc> diff
+nc> apply --dry-run
+nc> apply
+nc> exit
 ```
 
 ---
 
-## 5. Design Principles
+## Shell Commands
 
-- Constraints over autonomy
-- Transparency over magic
-- User-in-the-loop always
-- Safety enforced in code
-
----
-
-## 6. Architecture (High Level)
-
-CLI → State → Prompt Engine → Local LLM → Diff → Validator → Apply/Revert
-
----
-
-## 7. Model Strategy
-
-- Code model: Qwen2.5-Coder 7B Instruct (via Ollama)
-- Embeddings (optional, local-only): small deterministic model
-- Mode: deterministic, single-file execution
+| Command              | Description             |
+| -------------------- | ----------------------- |
+| `open <file>`        | Track a single file     |
+| `ask <question>`     | Read-only explanation   |
+| `edit <instruction>` | Generate a unified diff |
+| `diff`               | Show last diff          |
+| `apply`              | Apply diff              |
+| `apply --dry-run`    | Preview only            |
+| `exit`               | Clean shutdown          |
 
 ---
 
-## 8. Interaction Modes
+## Guarantees
 
-### Ask Mode (Read-Only)
-- Interactive shell
-- No disk writes
-- Pure explanation
-
-### Edit Mode (Transactional)
-- Single-shot by default
-- Optional constrained instruction shell
-- Always diff-only
-- Never auto-apply
+* One file at a time
+* File hash verified before edits
+* Diff-only edits
+* No auto-apply
+* Deterministic local model
 
 ---
 
-## 9. Intent Normalization (Post-MVP)
+## Terminal Compatibility
 
-After the basic `ask` and `edit` functionality is stable, nc may optionally introduce
-**embedding-based intent normalization** to improve UX in the edit shell.
+Designed to work reliably with:
 
-Scope is strictly limited:
-- Fuzzy matching of synonyms
-- Classification into fixed buckets (goal / constraints)
-- No autonomous reasoning
-- No hidden intent generation
+* PowerShell
+* Windows Terminal
+* VS Code integrated terminal
 
-Embeddings are used only as a parser, never as a decision-maker.
+No readline / curses / external UI libraries used.
 
 ---
 
-## 10. Success Criteria
+## Status
 
-- Simple feature implementations
-- Predictable diffs
-- Minimal edits
-- Low system requirements
-- Easy to reason about
+MVP complete.
+Edit pipeline hardened.
+Shell UX stabilized.
