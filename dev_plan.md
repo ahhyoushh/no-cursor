@@ -44,26 +44,45 @@ A deterministic, local-first code assistant that prioritizes safety, inspectabil
 
 ---
 
-## Phase 12 (NEXT)
+## Phase 12 (DONE)
 
-* Undo / revert stack
-* Status / health command
-* Diff confidence scoring
-* Structured multi-line edit input
+* Undo / revert stack (Single-level backup)
+* Status / stats tracking (Usage metrics)
+* Diff confidence scoring (Model self-evaluation)
+* Logic-aware automated fixing (`fix` audit)
+* Semantic code search (Active file scope)
+
+---
+
+## Phase 13 (DONE)
+
+* Persistent file-specific states
+* High-res Implementation Planning (`plan`)
+* Decoupled Plan/Save workflow
+* Multi-stage resilient diff application
+* Rich UI console experience
+
+---
+
+## Phase 14 (NEXT)
+
+* Multi-file context injection
+* Sequential plan execution automation
+* Conversation summary for long histories
+* Workspace-wide semantic indexing
 
 ---
 
 ## Non-Goals
 
-* Autonomous agents
-* Background daemons
+* Autonomous agents (Auto-mutate without user `apply`)
 * Cloud inference
-* Silent edits
+* Background daemons
 
 ---
 
 ## Current Status
 
-Core system complete.
-Remaining work is UX polish and safety hardening.
+Assistant ecosystem ready.
+Focus shifting to multi-file awareness and workspace-level intelligence.
 

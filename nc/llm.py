@@ -3,6 +3,7 @@ import time
 import json
 import urllib.request
 import socket
+from pathlib import Path
 
 from .config import (
     LLAMA_SERVER_BIN,
@@ -10,8 +11,13 @@ from .config import (
     TEMPERATURE,
     TOP_P,
     SEED,
+    MAX_TOKENS,
+    CONTEXT_SIZE,
 )
-from .prompts import ASK_SYSTEM_PROMPT, EDIT_SYSTEM_PROMPT
+from .prompts import (
+    ASK_SYSTEM_PROMPT, EDIT_SYSTEM_PROMPT, VERIFY_SYSTEM_PROMPT,
+    CHAT_SYSTEM_PROMPT, SEARCH_SYSTEM_PROMPT, PLAN_SYSTEM_PROMPT, FIX_SYSTEM_PROMPT
+)
 
 
 def _free_port():
@@ -23,6 +29,9 @@ def _free_port():
 
 
 def start_server():
+    if not Path(LLAMA_SERVER_BIN).exists():
+        raise FileNotFoundError(f"llama-server binary not found at: {LLAMA_SERVER_BIN}")
+
     port = _free_port()
 
     process = subprocess.Popen(
@@ -31,7 +40,7 @@ def start_server():
             "--model", MODEL_PATH,
             "--host", "127.0.0.1",
             "--port", str(port),
-            "--ctx-size", "1024",
+            "--ctx-size", str(CONTEXT_SIZE),
             "--cache-ram", "0",
             "--temp", str(TEMPERATURE),
             "--top-p", str(TOP_P),
@@ -53,15 +62,30 @@ def start_server():
     raise RuntimeError("llama-server failed to start")
 
 
-def _chat(port, messages, max_tokens):
-    url = f"http://127.0.0.1:{port}/v1/chat/completions"
+def _chat(port, system_content, user_content, history=None, max_tokens=None):
+    if max_tokens is None:
+        max_tokens = MAX_TOKENS
+
+    url = f"http://127.0.0.1:{port}/v1/completions"
+
+    full_prompt = f"{system_content.strip()}\n"
+    if history:
+        for msg in history:
+            role = msg["role"]
+            content = msg["content"]
+            if role == "user":
+                full_prompt += f"<|user|>\n{content}\n"
+            elif role == "assistant":
+                full_prompt += f"<|assistant|>\n{content}\n"
+    
+    full_prompt += f"<|user|>\n{user_content}\n<|assistant|>\n"
 
     payload = {
-        "model": "local",
-        "messages": messages,
-        "temperature": 0.0,
-        "top_p": 1.0,
+        "prompt": full_prompt,
+        "temperature": TEMPERATURE,
+        "top_p": TOP_P,
         "max_tokens": max_tokens,
+        "stop": ["<|user|>", "<|assistant|>", "<|system|>", "###"],
     }
 
     req = urllib.request.Request(
@@ -71,31 +95,83 @@ def _chat(port, messages, max_tokens):
         method="POST",
     )
 
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        out = json.loads(resp.read().decode())
-        return out["choices"][0]["message"]["content"].strip()
+    start_time = time.time()
+    try:
+        with urllib.request.urlopen(req, timeout=300) as resp:
+            out = json.loads(resp.read().decode())
+            end_time = time.time()
+            
+            duration = end_time - start_time
+            content = out["choices"][0]["text"].strip()
+            
+            usage = out.get("usage", {})
+            prompt_tokens = usage.get("prompt_tokens", 0)
+            completion_tokens = usage.get("completion_tokens", 0)
+            
+            metrics = {
+                "duration": duration,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "tokens_per_sec": completion_tokens / duration if duration > 0 else 0
+            }
+            
+            return content, metrics
+            
+    except urllib.error.HTTPError as e:
+        error_body = e.read().decode()
+        try:
+            error_json = json.loads(error_body)
+            error_msg = error_json.get("error", {}).get("message", error_body)
+        except Exception:
+            error_msg = error_body
+        raise RuntimeError(f"Server returned {e.code}: {error_msg}") from e
+    except Exception as e:
+        raise RuntimeError(f"LLM request failed: {str(e)}") from e
 
 
 def ask_once(port, prompt):
-    return _chat(
-        port,
-        [
-            {"role": "system", "content": ASK_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt},
-        ],
-        256,
-    )
+    return _chat(port, ASK_SYSTEM_PROMPT, prompt)
 
 
 def run_edit_llm(port, file_text, instruction):
-    return _chat(
-        port,
-        [
-            {"role": "system", "content": EDIT_SYSTEM_PROMPT},
-            {
-                "role": "user",
-                "content": f"FILE:\n{file_text}\n\nINSTRUCTION:\n{instruction}",
-            },
-        ],
-        256,
+    user_prompt = f"FILE:\n{file_text}\n\nINSTRUCTION:\n{instruction}"
+    return _chat(port, EDIT_SYSTEM_PROMPT, user_prompt)
+
+def run_chat_llm(port, history, message):
+    return _chat(port, CHAT_SYSTEM_PROMPT, message, history=history)
+
+def run_search_llm(port, query, snippets):
+    user_prompt = f"QUERY: {query}\n\nCODE SNIPPETS:\n{snippets}"
+    return _chat(port, SEARCH_SYSTEM_PROMPT, user_prompt)
+
+def run_plan_llm(port, goal, context=""):
+    user_prompt = f"GOAL: {goal}\n\nCONTEXT:\n{context}"
+    return _chat(port, PLAN_SYSTEM_PROMPT, user_prompt)
+
+def run_fix_llm(port, file_text):
+    return _chat(port, FIX_SYSTEM_PROMPT, f"FILE CONTENT:\n{file_text}")
+
+
+
+
+def get_confidence_score(port, file_text, instruction, diff):
+    verify_prompt = (
+        f"ORIGINAL CODE:\n{file_text}\n\n"
+        f"INSTRUCTION:\n{instruction}\n\n"
+        f"GENERATED DIFF:\n{diff}"
     )
+    try:
+        content, _ = _chat(port, VERIFY_SYSTEM_PROMPT, verify_prompt, max_tokens=256)
+        
+        if "{" in content and "}" in content:
+            try:
+                start = content.index("{")
+                end = content.rindex("}") + 1
+                content = content[start:end]
+            except Exception:
+                pass
+            
+        data = json.loads(content)
+        return data.get("score", 0), data.get("reason", "No reason provided")
+    except Exception as e:
+        return 0, f"Verification failed to parse JSON from response: {content[:100]}... Error: {str(e)}"

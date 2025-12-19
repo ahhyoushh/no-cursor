@@ -2,8 +2,12 @@ import sys
 from pathlib import Path
 
 
+from rich.console import Console
+
+console = Console()
+
 def die(msg):
-    print(f"nc: error: {msg}", file=sys.stderr)
+    console.print(f"[bold red]nc: error:[/bold red] {msg}", style="red")
     sys.exit(1)
 
 

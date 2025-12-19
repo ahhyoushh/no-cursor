@@ -5,6 +5,7 @@ nc/config.py
 nc/diff_utils.py
 nc/llm.py
 nc/prompts.py
+nc/utils.py
 no_cursor.egg-info/PKG-INFO
 no_cursor.egg-info/SOURCES.txt
 no_cursor.egg-info/dependency_links.txt

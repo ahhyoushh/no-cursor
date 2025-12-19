@@ -41,11 +41,15 @@ This will:
 ```bash
 nc init
 nc> open test.py
-nc> ask explain this file
-nc> edit "replace b = x with b = a + x and print a + b"
-nc> diff
-nc> apply --dry-run
-nc> apply
+nc> chat                     # Start a conversation about the code
+nc> search "divide logic"    # Find specific logic in the active file
+nc> fix                      # Audit the file for bugs and auto-repair
+nc> plan "Add error logs"    # Generate a roadmap
+nc> save-plan                # Persist the plan for later
+nc> edit "Apply the plan"    # Request the code changes
+nc> diff                     # Preview changes (includes Confidence Score)
+nc> apply                    # Commit to disk (auto-backup created)
+nc> stats                    # See usage metrics
 nc> exit
 ```
 
@@ -53,40 +57,51 @@ nc> exit
 
 ## Shell Commands
 
-| Command              | Description             |
-| -------------------- | ----------------------- |
-| `open <file>`        | Track a single file     |
-| `ask <question>`     | Read-only explanation   |
-| `edit <instruction>` | Generate a unified diff |
-| `diff`               | Show last diff          |
-| `apply`              | Apply diff              |
-| `apply --dry-run`    | Preview only            |
-| `exit`               | Clean shutdown          |
+### Core Operations
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
+| `open <file>`        | Focus a single file for editing           |
+| `edit <msg>`         | Request code changes (Unified Diff)      |
+| `diff`               | Preview generated changes                 |
+| `apply`              | Commit changes with auto-backup           |
+| `revert`             | Restore the last committed backup         |
+
+### Assistance & AI
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
+| `chat [<msg>]`       | Interactive conversation (with history)   |
+| `ask <msg>`          | One-off read-only question                |
+| `explain`            | Concise logic summary                     |
+| `show-chat`          | View full history for active file        |
+
+### Automation & Tools
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
+| `fix`                | Proactive bug audit and auto-repair       |
+| `plan <goal>`        | Generate a step-by-step roadmap           |
+| `save-plan`          | Store the generated plan file-specifically|
+| `show-plans`         | List all saved plans for the active file |
+| `search <query>`     | Semantic search within the active file    |
+
+### System
+| Command              | Description                               |
+| -------------------- | ----------------------------------------- |
+| `status / stats`     | Workspace health and usage metadata       |
+| `ls / cat / pwd`     | standard filesystem utilities             |
+| `help / clear`       | Console management                        |
+| `exit`               | Clean shutdown of server and console      |
 
 ---
 
 ## Guarantees
 
-* One file at a time
-* File hash verified before edits
-* Diff-only edits
-* No auto-apply
-* Deterministic local model
-
----
-
-## Terminal Compatibility
-
-Designed to work reliably with:
-
-* PowerShell
-* Windows Terminal
-* VS Code integrated terminal ? Vim
-
-No readline / curses / external UI libraries used.
+* **Context Awareness**: Chat and Plans are tied to the active file.
+* **Deterministic**: No cloud calls. All logic processed by the local model.
+* **Inspectable**: Diffs are validated and shown with confidence scores.
+* **Safety First**: Manual `apply` and automated backups for every edit.
 
 ---
 
 ## Status
+Active development. All features listed above are fully implemented and functional locally.
 
-MVP complete.
