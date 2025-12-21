@@ -21,19 +21,14 @@ from .llm import (
     start_server, ask_once, run_edit_llm, get_confidence_score,
     run_chat_llm, run_search_llm, run_plan_llm, run_fix_llm
 )
-from .diff_utils import validate_unified_diff, apply_diff
-from .utils import die, read_text_file
+from .diff_utils import validate_unified_diff, apply_diff, generate_diff
+from .utils import die, read_text_file, split_response
 
 
 
 
-NC_DIR = Path(".nc")
-STATE_FILE = NC_DIR / "state.json"
-BACKUP_DIR = NC_DIR / "backup"
-LOCK_FILE = NC_DIR / "lock"
-LAST_DIFF = NC_DIR / "last.diff"
-
-
+NC_DIR, LOCK_FILE, LAST_DIFF = Path(".nc"), Path(".nc/lock"), Path(".nc/last.diff")
+STATE_FILE, BACKUP_DIR = Path(".nc/state.json"), Path(".nc/backup")
 
 console = Console()
 
@@ -152,8 +147,14 @@ def cmd_exit():
         pass
     finally:
         release_lock()
-        info("Exited.")
+        info("Exited and stopped server.")
         sys.exit(0)
+
+
+def cmd_quit():
+    release_lock()
+    info("Exited shell (server still running).")
+    sys.exit(0)
 
 
 
@@ -170,13 +171,8 @@ def cmd_open(arg):
         return
 
     state = load_state()
-    file_data = state.setdefault("files", {}).setdefault(str(path), {"chat_history": [], "plans": []})
-    
-    state.update({
-        "open_file": str(path),
-        "file_hash": compute_hash(path),
-        "opened_at": datetime.now(UTC).isoformat(),
-    })
+    state.setdefault("files", {}).setdefault(str(path), {"chat_history": [], "plans": []})
+    state.update({"open_file": str(path), "file_hash": compute_hash(path), "opened_at": datetime.now(UTC).isoformat()})
     write_state(state)
     success(f"Opened [cyan]{path}[/cyan]")
 
@@ -227,7 +223,6 @@ def cmd_edit(arg):
     last_error = "model failed to produce a valid diff"
     
     with console.status("[bold yellow]Editing code...", spinner="bouncingBar"):
-        # We try up to 2 times, but only if the first attempt looked like a diff but was garbled
         for attempt in range(2):
             try:
                 out, metrics = run_edit_llm(state["llama_port"], text, arg)
@@ -237,41 +232,75 @@ def cmd_edit(arg):
                     last_error = "model returned empty response"
                     continue
                 
-                # Check if it looks like a message rather than a diff
-                if "@@" not in out and "---" not in out:
-                    console.print(Panel(out.strip(), title="Model Response", border_style="blue"))
+                if out.strip().upper() == "ERROR GENERATING DIFF":
+                    warn("Model failed to generate a diff for this request.")
                     return
 
-                try:
-                    cleaned = validate_unified_diff(out)
-                    diff = cleaned
+                preamble, contents = split_response(out)
+                
+                extracted_diff = None
+                for ctype, cblock in contents:
+                    if ctype == 'diff' or (ctype == 'code' and ("@@ " in cblock or "--- " in cblock)):
+                        try:
+                            extracted_diff = validate_unified_diff(cblock)
+                            break
+                        except Exception as ve:
+                            last_error = f"Validating diff block failed: {ve}"
+                            continue
+                
+                if not extracted_diff:
+                    try:
+                        extracted_diff = validate_unified_diff(out)
+                    except Exception as ve:
+                        if not last_error or "Validating" not in last_error:
+                            last_error = f"Validating whole response as diff failed: {ve}"
+                
+                if not extracted_diff:
+                    code_blocks = [cblock for ctype, cblock in contents if ctype == 'code']
+                    if code_blocks:
+                        new_code = code_blocks[-1]
+                        extracted_diff = generate_diff(text, new_code, path.name)
+                        if not extracted_diff.strip():
+                            extracted_diff = None
+                            last_error = "Model code block matches existing code (no changes)."
+
+                if extracted_diff:
+                    score, reason = get_confidence_score(state["llama_port"], text, arg, extracted_diff)
+                    
+                    if score <= 0:
+                        last_error = f"Model produced an invalid or template response: {reason}"
+                        continue
+
+                    # We skip printing preamble as per user request for "only reply using a proper diff"
+                    
+                    diff = extracted_diff
                     success(f"Generated diff ({metrics['completion_tokens']} tokens at {metrics['tokens_per_sec']:.1f} t/s)")
                     
-                    # Confidence scoring
-
-                    score, reason = get_confidence_score(state["llama_port"], text, arg, diff)
                     color = "green" if score >= 90 else "yellow" if score >= 60 else "red"
                     console.print(f"[bold {color}]Confidence: {score}%[/bold {color}] - [dim]{reason}[/dim]")
                     
+                    LAST_DIFF.write_text(diff, encoding="utf-8")
+                    
+                    # Automatically show the diff
+                    syntax = Syntax(diff, "diff", theme="monokai", line_numbers=True)
+                    console.print(Panel(syntax, title="Proposed Changes", border_style="yellow"))
+                    
                     if score < 60:
-                        warn("Low confidence score. Please review the diff carefully with 'diff' before applying.")
-                    
+                        warn("Low confidence. Review changes carefully before applying.")
+                    else:
+                        info("Use 'apply' to commit these changes.")
                     break
-                except ValueError as ve:
-                    last_error = f"diff validation failed: {str(ve)}"
-                    
+                else:
+                    last_error = "Model failed to produce a valid diff in its response."
                     continue
 
             except Exception as e:
-                last_error = f"edit error: {str(e)}"
+                last_error = f"Edit attempt {attempt+1} failed: {str(e)}"
                 continue
 
     if not diff:
-        warn(last_error)
+        warn(f"Failed to generate valid changes: {last_error}")
         return
-
-    LAST_DIFF.write_text(diff, encoding="utf-8")
-    info("Diff generated. Use `diff` to view or `apply` to commit changes.")
 
 
 def cmd_diff():
@@ -626,6 +655,7 @@ def cmd_help():
     table.add_row("", "ls / cat / pwd", "File system utilities")
     table.add_row("", "clear / help", "Console management")
     table.add_row("", "exit", "Shutdown server and exit")
+    table.add_row("", "q / qs / quit", "Exit shell (server stays running)")
     
     console.print(table)
 
@@ -653,6 +683,9 @@ def shell_loop():
         "revert": lambda _: cmd_revert(),
         "status": lambda _: cmd_status(),
         "exit": lambda _: cmd_exit(),
+        "q": lambda _: cmd_quit(),
+        "qs": lambda _: cmd_quit(),
+        "quit": lambda _: cmd_quit(),
         "help": lambda _: cmd_help(),
         "ls": lambda a: subprocess.run(["dir", "/b"] if os.name == "nt" else ["ls", "-F"], shell=True),
         "dir": lambda a: subprocess.run(["dir"] if os.name == "nt" else ["ls", "-l"], shell=True),
@@ -713,6 +746,8 @@ def main():
     sub.add_parser("init")
     sub.add_parser("exit")
     sub.add_parser("shell")
+    sub.add_parser("stats")
+    sub.add_parser("status")
 
     args = parser.parse_args()
     if args.cmd == "init":
@@ -721,6 +756,10 @@ def main():
         cmd_exit()
     elif args.cmd == "shell":
         shell_loop()
+    elif args.cmd == "stats":
+        cmd_stats()
+    elif args.cmd == "status":
+        cmd_status()
     else:
         # Default behavior if run without args (and initialized)
         if STATE_FILE.exists():

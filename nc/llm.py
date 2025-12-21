@@ -63,22 +63,17 @@ def start_server():
 
 
 def _chat(port, system_content, user_content, history=None, max_tokens=None):
-    if max_tokens is None:
-        max_tokens = MAX_TOKENS
-
+    if max_tokens is None: max_tokens = MAX_TOKENS
     url = f"http://127.0.0.1:{port}/v1/completions"
-
-    full_prompt = f"{system_content.strip()}\n"
+    
+    parts = [system_content.strip()]
     if history:
         for msg in history:
-            role = msg["role"]
-            content = msg["content"]
-            if role == "user":
-                full_prompt += f"<|user|>\n{content}\n"
-            elif role == "assistant":
-                full_prompt += f"<|assistant|>\n{content}\n"
+            role, content = msg["role"], msg["content"]
+            parts.append(f"<|{role}|>\n{content}")
     
-    full_prompt += f"<|user|>\n{user_content}\n<|assistant|>\n"
+    parts.append(f"<|user|>\n{user_content}\n<|assistant|>\n")
+    full_prompt = "\n".join(parts)
 
     payload = {
         "prompt": full_prompt,
@@ -89,42 +84,24 @@ def _chat(port, system_content, user_content, history=None, max_tokens=None):
     }
 
     req = urllib.request.Request(
-        url,
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+        url, data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"}, method="POST",
     )
 
     start_time = time.time()
     try:
         with urllib.request.urlopen(req, timeout=300) as resp:
             out = json.loads(resp.read().decode())
-            end_time = time.time()
-            
-            duration = end_time - start_time
+            duration = time.time() - start_time
             content = out["choices"][0]["text"].strip()
-            
             usage = out.get("usage", {})
-            prompt_tokens = usage.get("prompt_tokens", 0)
-            completion_tokens = usage.get("completion_tokens", 0)
-            
             metrics = {
                 "duration": duration,
-                "prompt_tokens": prompt_tokens,
-                "completion_tokens": completion_tokens,
-                "tokens_per_sec": completion_tokens / duration if duration > 0 else 0
+                "prompt_tokens": usage.get("prompt_tokens", 0),
+                "completion_tokens": usage.get("completion_tokens", 0),
+                "tokens_per_sec": usage.get("completion_tokens", 0) / duration if duration > 0 else 0
             }
-            
             return content, metrics
-            
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode()
-        try:
-            error_json = json.loads(error_body)
-            error_msg = error_json.get("error", {}).get("message", error_body)
-        except Exception:
-            error_msg = error_body
-        raise RuntimeError(f"Server returned {e.code}: {error_msg}") from e
     except Exception as e:
         raise RuntimeError(f"LLM request failed: {str(e)}") from e
 
@@ -163,15 +140,32 @@ def get_confidence_score(port, file_text, instruction, diff):
     try:
         content, _ = _chat(port, VERIFY_SYSTEM_PROMPT, verify_prompt, max_tokens=256)
         
+        # Robust JSON extraction
+        json_content = content
         if "{" in content and "}" in content:
             try:
-                start = content.index("{")
-                end = content.rindex("}") + 1
-                content = content[start:end]
+                # Find the largest possible JSON object block
+                start = content.find("{")
+                end = content.rfind("}") + 1
+                json_content = content[start:end]
             except Exception:
                 pass
             
-        data = json.loads(content)
+        try:
+            data = json.loads(json_content)
+        except json.JSONDecodeError:
+            # Try to see if there's any JSON-like part that works
+            import re
+            matches = re.findall(r"\{.*?\}", content, re.DOTALL)
+            for m in matches:
+                try:
+                    data = json.loads(m)
+                    if "score" in data:
+                        return data.get("score", 0), data.get("reason", "No reason provided")
+                except:
+                    continue
+            raise # Re-raise if no luck
+
         return data.get("score", 0), data.get("reason", "No reason provided")
     except Exception as e:
         return 0, f"Verification failed to parse JSON from response: {content[:100]}... Error: {str(e)}"
