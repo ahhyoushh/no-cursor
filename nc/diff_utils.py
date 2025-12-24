@@ -113,6 +113,15 @@ def apply_diff(diff_content: str, target: Path):
                     if any(search_lines[j].strip() for j in range(len(search_lines))):
                         found_idx = i
                         break
+        
+        # 3. Handle EOF issue: diff expects a trailing empty line that splitlines() dropped
+        if found_idx == -1 and search_lines and search_lines[-1] == "":
+            short_search = search_lines[:-1]
+            if len(new_content_lines) >= len(short_search):
+                # Check for exact match at the very end of file
+                start_at = len(new_content_lines) - len(short_search)
+                if all(new_content_lines[start_at+j] == short_search[j] for j in range(len(short_search))):
+                    found_idx = start_at
 
         if found_idx == -1:
             raise ValueError(f"Hunk starting at line {hunk['old_start']} failed to apply (content not found).")
