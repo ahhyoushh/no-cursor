@@ -3,7 +3,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 LLAMA_SERVER_BIN = "C:/llama/llama-server.exe"
-MODEL_PATH = str(BASE_DIR / "models" / "deepseek-coder-1.3b-instruct.Q4_0.gguf")
+MODEL_PATH = str(BASE_DIR / "models" / "qwen2.5-coder-3b-instruct-q4_k_m.gguf")
 
 TEMPERATURE = 0.0
 TOP_P = 1.0

@@ -66,21 +66,23 @@ def _chat(port, system_content, user_content, history=None, max_tokens=None):
     if max_tokens is None: max_tokens = MAX_TOKENS
     url = f"http://127.0.0.1:{port}/v1/completions"
     
-    parts = [system_content.strip()]
+    # ChatML format construction
+    full_prompt = f"<|im_start|>system\n{system_content.strip()}<|im_end|>\n"
+    
     if history:
         for msg in history:
-            role, content = msg["role"], msg["content"]
-            parts.append(f"<|{role}|>\n{content}")
+            role = msg["role"]
+            content = msg["content"]
+            full_prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
     
-    parts.append(f"<|user|>\n{user_content}\n<|assistant|>\n")
-    full_prompt = "\n".join(parts)
+    full_prompt += f"<|im_start|>user\n{user_content}<|im_end|>\n<|im_start|>assistant\n"
 
     payload = {
         "prompt": full_prompt,
         "temperature": TEMPERATURE,
         "top_p": TOP_P,
         "max_tokens": max_tokens,
-        "stop": ["<|user|>", "<|assistant|>", "<|system|>", "###"],
+        "stop": ["<|im_start|>", "<|im_end|>"],
     }
 
     req = urllib.request.Request(

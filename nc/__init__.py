@@ -263,6 +263,16 @@ def cmd_edit(arg):
                         if not extracted_diff.strip():
                             extracted_diff = None
                             last_error = "Model code block matches existing code (no changes)."
+                    
+                    # Fallback: if no blocks found, tries to see if the whole output is code
+                    if not extracted_diff and not code_blocks:
+                        # Simple heuristic: if it contains typical code keywords
+                        if any(k in out for k in ("def ", "class ", "import ", "return ")):
+                            extracted_diff = generate_diff(text, out, path.name)
+                            if not extracted_diff.strip():
+                                extracted_diff = None
+                                # Don't overwrite if we had a specific error before, but here we likely didn't
+                                last_error = "Model response (treated as code) matches existing code."
 
                 if extracted_diff:
                     score, reason = get_confidence_score(state["llama_port"], text, arg, extracted_diff)
@@ -291,7 +301,8 @@ def cmd_edit(arg):
                         info("Use 'apply' to commit these changes.")
                     break
                 else:
-                    last_error = "Model failed to produce a valid diff in its response."
+                    if not last_error or last_error == "model returned empty response":
+                        last_error = "Model failed to produce a valid diff or code block."
                     continue
 
             except Exception as e:
@@ -300,6 +311,8 @@ def cmd_edit(arg):
 
     if not diff:
         warn(f"Failed to generate valid changes: {last_error}")
+        if 'out' in locals() and out:
+            console.print(Panel(out, title="Raw Model Response (Debug)", border_style="red"))
         return
 
 
@@ -332,7 +345,7 @@ def cmd_apply(arg=None):
     backup.write_bytes(path.read_bytes())
 
     try:
-        apply_diff(LAST_DIFF, path)
+        apply_diff(LAST_DIFF.read_text(encoding="utf-8"), path)
         state["file_hash"] = compute_hash(path)
         write_state(state)
         success("Diff applied successfully (backup created).")
