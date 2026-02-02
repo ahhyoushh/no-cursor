@@ -18,7 +18,6 @@ def generate_diff(old_text: str, new_text: str, filename: str = "FILE") -> str:
 
 def validate_unified_diff(diff_text: str) -> str:
     """Extracts diff from markdown and validates structure."""
-    # Extract from markdown block if the model used one
     match = re.search(r"```(?:diff)?\n(.*?)\n```", diff_text, re.DOTALL)
     if match:
         diff_text = match.group(1)
@@ -106,7 +105,7 @@ def apply_diff(diff_content: str, target: Path):
                 found_idx = i
                 break
         
-        # 2. Try match with stripped whitespace (more lenient)
+        # 2. Try match with stripped whitespace to go easy
         if found_idx == -1:
             for i in range(len(new_content_lines) - len(search_lines) + 1):
                 if all(new_content_lines[i+j].strip() == search_lines[j].strip() for j in range(len(search_lines))):
@@ -114,7 +113,7 @@ def apply_diff(diff_content: str, target: Path):
                         found_idx = i
                         break
         
-        # 3. Handle EOF issue: diff expects a trailing empty line that splitlines() dropped
+        # 3. Handle EOF issue
         if found_idx == -1 and search_lines and search_lines[-1] == "":
             short_search = search_lines[:-1]
             if len(new_content_lines) >= len(short_search):
